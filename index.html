@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Flashcard Learning System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="icon" href="data:,">
+    <style>
+        .btn-group { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
+        .hidden { display: none; }
+        #flashcard-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .arrow-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #007bff;
+            color: white;
+            border: none;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .arrow-btn:hover { background: #0056b3; }
+        .flashcard {
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+            min-width: 350px;
+            text-align: center;
+        }
+        .flashcard strong { display: block; margin-bottom: 5px; }
+        .review-btn { display: block; margin: 15px auto; width: 50%; font-size: 16px; }
+        .create-flashcard {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .create-flashcard input { width: 100%; margin-bottom: 10px; }
+        .create-flashcard button { width: 100%; }
+    </style>
+</head>
+<body class="container mt-4">
+    <h2 class="text-center">AI-Powered Flashcard System</h2>
+
+    <div class="create-flashcard">
+        <h4 class="text-center">Create Flashcard</h4>
+        <input type="text" id="question" class="form-control mt-2" placeholder="Enter question">
+        <input type="text" id="answer" class="form-control mt-2" placeholder="Enter answer">
+        <button class="btn btn-primary mt-2" onclick="addFlashcard()">Add Flashcard</button>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn btn-success" onclick="showSection('flashcards')">Load Flashcards</button>
+        <button class="btn btn-info" onclick="showSection('analytics')">Show Analytics</button>
+        <button class="btn btn-warning" onclick="showSection('aiSuggestions')">Get AI Suggestions</button>
+    </div>
+
+    <div id="flashcards" class="mt-4 hidden">
+        <h4 class="text-center">Review Flashcards</h4>
+        <div id="flashcard-container">
+            <button class="arrow-btn" onclick="prevFlashcard()"><i class="fa-solid fa-chevron-left"></i></button>
+            <div id="flashcard" class="flashcard"></div>
+            <button class="arrow-btn" onclick="nextFlashcard()"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+        <button class="btn btn-primary mt-3 review-btn" onclick="markReviewed()">Mark as Reviewed</button>
+    </div>
+
+    <div id="analytics" class="mt-4 hidden">
+        <h4>Review Analytics</h4>
+        <div id="analytics-content"></div>
+    </div>
+
+    <div id="aiSuggestions" class="mt-4 hidden">
+        <h4>AI-Based Suggestions</h4>
+        <div id="aiSuggestions-content"></div>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:5000";
+        let flashcards = [];
+        let currentFlashcardIndex = 0;
+
+        function showSection(sectionId) {
+            document.getElementById("flashcards").classList.add("hidden");
+            document.getElementById("analytics").classList.add("hidden");
+            document.getElementById("aiSuggestions").classList.add("hidden");
+            document.getElementById(sectionId).classList.remove("hidden");
+            if (sectionId === "flashcards") getFlashcards();
+            if (sectionId === "analytics") getAnalytics();
+            if (sectionId === "aiSuggestions") getAISuggestions();
+        }
+
+        async function addFlashcard() {
+            const question = document.getElementById("question").value.trim();
+            const answer = document.getElementById("answer").value.trim();
+            if (!question || !answer) {
+                alert("Enter both question and answer!");
+                return;
+            }
+            await fetch(`${API_URL}/flashcards`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify([{ "question": question, "answer": answer }])
+            });
+            alert("Flashcard added!");
+            getFlashcards();
+        }
+
+        async function getFlashcards() {
+            const res = await fetch(`${API_URL}/review`);
+            flashcards = await res.json();
+            currentFlashcardIndex = 0;
+            displayFlashcard();
+        }
+
+        function displayFlashcard() {
+            if (flashcards.length === 0) {
+                document.getElementById("flashcard").innerHTML = "No flashcards available.";
+                return;
+            }
+            const flashcard = flashcards[currentFlashcardIndex];
+            document.getElementById("flashcard").innerHTML = `
+                <strong>Question:</strong> ${flashcard.question}<br>
+                <strong>Answer:</strong> ${flashcard.answer}<br>
+                <strong>Reviewed:</strong> ${flashcard.review_count} times
+            `;
+        }
+
+        function prevFlashcard() {
+            if (currentFlashcardIndex > 0) {
+                currentFlashcardIndex--;
+                displayFlashcard();
+            }
+        }
+
+        function nextFlashcard() {
+            if (currentFlashcardIndex < flashcards.length - 1) {
+                currentFlashcardIndex++;
+                displayFlashcard();
+            }
+        }
+
+        async function markReviewed() {
+            const id = flashcards[currentFlashcardIndex].id;
+            const res = await fetch(`${API_URL}/review/${id}`, { method: 'POST' });
+            const data = await res.json();
+            flashcards[currentFlashcardIndex].review_count = data.review_count;
+            displayFlashcard();
+        }
+
+        async function getAnalytics() {
+            const res = await fetch(`${API_URL}/analytics`);
+            const data = await res.json();
+            let html = "<ul>";
+            data.forEach(f => {
+                html += `<li>${f.question} - Reviewed ${f.review_count} times</li>`;
+            });
+            html += "</ul>";
+            document.getElementById("analytics-content").innerHTML = html;
+        }
+
+        async function getAISuggestions() {
+            const res = await fetch(`${API_URL}/ai-suggestions`);
+            const data = await res.json();
+            let html = "<ul>";
+            data.forEach(f => {
+                html += `<li><strong>${f.question}</strong> - Suggested: ${f.suggested.join(", ")}</li>`;
+            });
+            html += "</ul>";
+            document.getElementById("aiSuggestions-content").innerHTML = html;
+        }
+    </script>
+</body>
+</html>
